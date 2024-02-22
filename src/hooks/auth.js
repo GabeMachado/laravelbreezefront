@@ -1,11 +1,15 @@
 import useSWR from 'swr'
 import axios from '@/lib/axios'
 import { useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/router'
+import { toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+
+axios.defaults.xsrfCookieName = 'XSRF-TOKEN'
+axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN'
 
 export const useAuth = ({ middleware, redirectIfAuthenticated } = {}) => {
     const router = useRouter()
-    const params = useParams()
 
     const { data: user, error, mutate } = useSWR('/api/user', () =>
         axios
@@ -33,6 +37,52 @@ export const useAuth = ({ middleware, redirectIfAuthenticated } = {}) => {
 
                 setErrors(error.response.data.errors)
             })
+    }
+
+    const registerWeight = async ({ setErrors, ...props }) => {
+        await csrf()
+
+        setErrors([])
+
+        axios
+            .post('/api/weights', props)
+            .then(() => {
+                toast.success('Peso adicionado com sucesso!')
+                mutate()
+            })
+            .catch(error => {
+                if (error.response.status !== 422) throw error
+                toast.error('O peso não foi adicionado!')
+                setErrors(error.response.data.errors)
+            })
+    }
+
+    const updateWeight = async ({ setErrors, ...props }) => {
+        await csrf()
+        setErrors([])
+
+        axios
+            .put(`api/weights/${props.idWeight.weight}`, props)
+            .then(() => {
+                toast.success('Peso atualizado com sucesso!')
+                mutate()
+            })
+            .catch(error => {
+                if (error.response.status !== 422) throw error
+                toast.error('O peso não foi atualizado!')
+                setErrors(error.response.data.errors)
+            })
+    }
+
+    const deleteWeight = async idWeight => {
+        try {
+            await csrf()
+            await axios.delete(`api/weights/${idWeight}`)
+            toast.success('Peso deletado com sucesso!')
+            mutate()
+        } catch (error) {
+            toast.error('O peso não foi deletado com sucesso!')
+        }
     }
 
     const login = async ({ setErrors, setStatus, ...props }) => {
@@ -74,7 +124,7 @@ export const useAuth = ({ middleware, redirectIfAuthenticated } = {}) => {
         setStatus(null)
 
         axios
-            .post('/reset-password', { token: params.token, ...props })
+            .post('/reset-password', { token: router.query.token, ...props })
             .then(response =>
                 router.push('/login?reset=' + btoa(response.data.status)),
             )
@@ -113,6 +163,9 @@ export const useAuth = ({ middleware, redirectIfAuthenticated } = {}) => {
     return {
         user,
         register,
+        registerWeight,
+        updateWeight,
+        deleteWeight,
         login,
         forgotPassword,
         resetPassword,
